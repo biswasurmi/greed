@@ -1,39 +1,33 @@
 .PHONY: all decompile prep greed clean
 
 # ---------------------------------------------------------------------------
-# greed-only storage read/write-set extraction.
+# Storage read/write-set extraction with greed.
 #
-# Nothing is written into the gigahorse checkout; override either location on
-# the command line, e.g.  make GIGAHORSE=/path/to/gigahorse-toolchain
+# Targets greed's docker image (ubuntu:22.04), where everything lives under
+# /home/greed. Run from inside the container with the venv activated:
+#     source /home/greed/greed-venv/bin/activate
 # ---------------------------------------------------------------------------
-GIGAHORSE ?= $(HOME)/gigahorse-toolchain
-GREED     ?= $(HOME)/greed
+GREED     ?= /home/greed
+GIGAHORSE ?= $(GREED)/gigahorse-toolchain
 
-# which contract to analyse
+# which contract to analyse:  make NAME=Other
 NAME = Max
 
-# greed needs libyices 2.6.x (see README: 2.7.0 has an incompatible enum).
-# macOS strips DYLD_* from signed binaries such as make, so the path has to be
-# set on the recipe line itself rather than inherited from the environment.
-YICES_LIB = $(wildcard $(GREED)/yices2/build/*-release/lib)
-
-# uv is not always on PATH (the greed venv prepends its own bin), so resolve it.
-UV := $(shell command -v uv 2>/dev/null || echo $(HOME)/.local/bin/uv)
-
-# gigahorse.py -w keeps its scratch dir here rather than in the gigahorse repo
+# gigahorse.py -w keeps its scratch dir here rather than in the gigahorse tree
 WORK = $(CURDIR)/.temp
 OUT  = $(WORK)/$(NAME)/out
 
 all: decompile prep greed
 
-# 1. Solidity -> runtime bytecode -> Gigahorse TAC (+ a CFG picture)
+# 1. Solidity -> runtime bytecode -> Gigahorse TAC.
+#    cfg.dot is written for reference; graphviz is not in the image, so render
+#    it elsewhere with:  dot -Tpng cfg.dot -o cfg.png
 decompile:
 	solc --bin-runtime --overwrite -o . $(NAME).sol
 	cp $(NAME).bin-runtime $(NAME).hex
-	cd $(GIGAHORSE) && $(UV) run ./gigahorse.py -C clients/visualizeout.py \
+	cd $(GIGAHORSE) && python3 ./gigahorse.py -C clients/visualizeout.py \
 	    -w $(WORK) --restart $(CURDIR)/$(NAME).hex
 	python3 cfg.py $(OUT) > cfg.dot
-	dot -Tpng cfg.dot -o cfg.png
 
 # 2. greed's own Datalog client -> the metadata greed needs, in one flat dir.
 #    This is Gigahorse/souffle work that greed DEPENDS on, not greed itself.
@@ -52,7 +46,7 @@ greed:
 	@test gtarget/contract.hex -nt $(NAME).sol || \
 	  { echo "*** gtarget/ is OLDER than $(NAME).sol - results would be stale."; \
 	    echo "*** run:  make decompile && make prep"; exit 1; }
-	DYLD_FALLBACK_LIBRARY_PATH=$(YICES_LIB) python greed_rwset.py gtarget
+	python3 greed_rwset.py gtarget
 
 clean:
 	rm -rf .temp out gtarget $(NAME).hex $(NAME).bin-runtime cfg.dot cfg.png
