@@ -1,0 +1,12 @@
+# gigahorse.py working dir (-w) and souffle output dirs
+.temp/
+out/
+gtarget/
+
+# build artifacts from `make`
+*.hex
+*.bin-runtime
+cfg.dot
+cfg.png
+
+__pycache__/
