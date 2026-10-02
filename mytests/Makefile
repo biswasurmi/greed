@@ -20,14 +20,14 @@ OUT  = $(WORK)/$(NAME)/out
 all: decompile prep greed
 
 # 1. Solidity -> runtime bytecode -> Gigahorse TAC.
-#    cfg.dot is written for reference; graphviz is not in the image, so render
-#    it elsewhere with:  dot -Tpng cfg.dot -o cfg.png
+#    graphviz is not in the base image:  apt-get install -y graphviz
 decompile:
 	solc --bin-runtime --overwrite -o . $(NAME).sol
 	cp $(NAME).bin-runtime $(NAME).hex
 	cd $(GIGAHORSE) && python3 ./gigahorse.py -C clients/visualizeout.py \
 	    -w $(WORK) --restart $(CURDIR)/$(NAME).hex
 	python3 cfg.py $(OUT) > cfg.dot
+	dot -Tpng cfg.dot -o cfg.png
 
 # 2. greed's own Datalog client -> the metadata greed needs, in one flat dir.
 #    This is Gigahorse/souffle work that greed DEPENDS on, not greed itself.

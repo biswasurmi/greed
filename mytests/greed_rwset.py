@@ -118,6 +118,10 @@ def slot_of(state, stmt):
 # "stor0x1 != int256.max" / "arg0 == int256.min" -> a Solidity 0.8 bound check
 BOUND = re.compile(r"^(?P<var>[\w.]+)\s*(?P<op>!=|==)\s*(?P<lim>int256\.(?:max|min))$")
 
+# "(SHA3_1 == keccak256(0))" / "(keccak256(2) == SHA3_3)" -> sha_resolver pinning a
+# hash symbol to its computed value. Definitional bookkeeping, not a condition.
+SHA_DEF = re.compile(r"^\(\s*(?:SHA3_\d+\s*==\s*[^=]+|[^=]+\s*==\s*SHA3_\d+)\s*\)$")
+
 
 def path_condition(state, keep_all=False):
     """Decode greed's path condition, split into (guard, reverts, n_hidden).
@@ -139,6 +143,8 @@ def path_condition(state, keep_all=False):
             continue                           # dispatcher / callvalue boilerplate
         if pretty in ("true", "false"):
             continue           # vacuous conjunct
+        if not keep_all and SHA_DEF.match(pretty):
+            continue           # sha_resolver pinning SHA3_n to its value
         m = BOUND.match(pretty)
         if m and not keep_all:
             if m.group("op") == "==":
